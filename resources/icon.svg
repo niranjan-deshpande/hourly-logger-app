@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- Gentle warm shift, top to bottom — aged cream paper, like the app. -->
+    <linearGradient id="tile" x1="512" y1="100" x2="512" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FAF4E4"/>
+      <stop offset="1" stop-color="#EFE5CD"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Warm cream tile, macOS squircle proportions (824 on a 1024 grid). -->
+  <rect x="100" y="100" width="824" height="824" rx="185" ry="185" fill="url(#tile)"/>
+
+  <!-- A small, restrained clock in warm espresso. -->
+  <g stroke="#33291C" fill="none" stroke-linecap="round">
+    <circle cx="512" cy="512" r="205" stroke-width="18"/>
+    <!-- cardinal ticks, just inside the rim -->
+    <line x1="512" y1="332" x2="512" y2="366" stroke-width="13"/>
+    <line x1="692" y1="512" x2="658" y2="512" stroke-width="13"/>
+    <line x1="512" y1="692" x2="512" y2="658" stroke-width="13"/>
+    <line x1="332" y1="512" x2="366" y2="512" stroke-width="13"/>
+    <!-- hour hand toward 10 -->
+    <line x1="512" y1="512" x2="421" y2="458" stroke-width="19"/>
+  </g>
+
+  <!-- Minute hand toward 2, in the app's clay accent — the one warm note. -->
+  <line x1="512" y1="512" x2="642" y2="437" stroke="#A66E5C" stroke-width="15" stroke-linecap="round"/>
+
+  <!-- Center pin -->
+  <circle cx="512" cy="512" r="12" fill="#33291C"/>
+</svg>

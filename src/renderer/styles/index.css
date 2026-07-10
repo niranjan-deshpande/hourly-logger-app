@@ -1,0 +1,181 @@
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Warm, earthy light palette — like aged cream paper. Slightly more
+     saturation than the previous near-white so the UI doesn't feel washed out,
+     while still leaving the category colors to do the heavy chromatic lifting. */
+  --bg: #F1E9D5;
+  --surface: #F8F1DE;
+  --ink: #1F1A12;
+  --muted: #5E5240;
+  --faint: #8B7E66;
+  --line: #CBBC9C;
+  --accent: #1F1A12;
+  --hover: #E5DABD;
+  --select: rgba(31, 26, 18, 0.10);
+
+  /* The hour grid in the day view needs more presence than card borders
+     or input outlines — bumping its contrast separately keeps the rest of
+     the chrome quiet. */
+  --hour-line: rgba(31, 26, 18, 0.22);
+  --half-hour-line: rgba(31, 26, 18, 0.09);
+
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #1C1C1A;
+  --surface: #232220;
+  --ink: #E8E6E0;
+  --muted: #98968F;
+  --faint: #6B6B66;
+  --line: #2F2D2A;
+  --accent: #E8E6E0;
+  --hover: #282724;
+  --select: rgba(232, 230, 224, 0.07);
+
+  --hour-line: rgba(232, 230, 224, 0.16);
+  --half-hour-line: rgba(232, 230, 224, 0.07);
+
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+input, button, textarea, select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Hide native focus ring; we apply our own */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 1.5px solid var(--ink);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+/* Scrollbars: thin, neutral */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--faint);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+/* Drag-region for hidden-inset titlebar; specific elements turn this off */
+.drag-region {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Reusable inputs */
+.input-bare {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 6px 8px;
+  font-size: 13px;
+  line-height: 18px;
+  transition: border-color 120ms ease;
+}
+.input-bare:hover { border-color: var(--faint); }
+.input-bare:focus { border-color: var(--ink); }
+
+.btn {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: var(--surface);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.btn:hover { background: var(--hover); }
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+.btn-primary:hover { opacity: 0.9; background: var(--ink); }
+
+.btn-ghost {
+  border-color: transparent;
+}
+.btn-ghost:hover { background: var(--hover); border-color: transparent; }
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--line);
+}
+
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.tag-pill:hover { background: var(--hover); color: var(--ink); }
+.tag-pill.active {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
+.popover {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.surface-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
