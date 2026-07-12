@@ -118,7 +118,7 @@ use Export → JSON. Only `data.db` is user data; the other files are app state
 | `⌘↵`           | Add the parsed blocks (in quick capture)              |
 | `1`–`9`        | Pick the Nth filtered result in a category combobox   |
 | `Ctrl+Option+P`| Hold to peek the live Pomodoro countdown (overlay)    |
-| `Alt + drag`   | 1-minute snap when dragging on timeline (default 5m)  |
+| `Alt + drag`   | 5-minute snap when dragging on timeline (default 15m) |
 
 ## Quick capture
 

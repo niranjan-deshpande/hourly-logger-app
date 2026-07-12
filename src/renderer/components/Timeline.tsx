@@ -157,7 +157,7 @@ export function Timeline({
       const baseMinutes = dayStart * 60 + (clamped / HOUR_HEIGHT) * 60;
       const d = new Date(startBase);
       d.setMinutes(Math.round(baseMinutes), 0, 0);
-      return snapMinutes(d, alt ? 1 : 15);
+      return snapMinutes(d, alt ? 5 : 15);
     },
     [day, dayStart, hours]
   );
