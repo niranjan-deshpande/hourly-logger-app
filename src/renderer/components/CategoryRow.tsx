@@ -282,9 +282,11 @@ function GoalsEditor({
   }
 
   return (
+    // Left-anchored like ColorPicker: the editor is wider than the sidebar,
+    // so it must grow rightward over the timeline, not toward the window edge.
     <div
       ref={rootRef}
-      className="popover absolute right-2 top-8 z-30 p-3 w-[240px]"
+      className="popover absolute left-2 top-8 z-40 p-3 w-[240px]"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="text-[11px] uppercase tracking-wider text-faint mb-2">
