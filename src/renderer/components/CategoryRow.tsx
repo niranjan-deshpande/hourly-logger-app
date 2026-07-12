@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Archive, ArchiveRestore, Edit3, Palette, Target } from 'lucide-react';
 import type { Category, Goal } from '@shared/types';
 import { formatHours } from '../lib/time';
+import { AnchoredPopover } from './AnchoredPopover';
 import { ColorPicker } from './ColorPicker';
 
 interface Props {
@@ -99,9 +100,13 @@ export function CategoryRow({
         </span>
       )}
       {menuOpen && (
-        <div
-          className="popover absolute right-2 top-8 z-30 py-1 min-w-[140px]"
+        <AnchoredPopover
+          anchor={rowRef.current}
+          onClose={() => setMenuOpen(false)}
           onMouseLeave={() => setMenuOpen(false)}
+          width={160}
+          align="end"
+          className="py-1"
         >
           <MenuItem
             icon={<Edit3 size={13} strokeWidth={1.5} />}
@@ -145,10 +150,11 @@ export function CategoryRow({
               await onUpdated();
             }}
           />
-        </div>
+        </AnchoredPopover>
       )}
       {goalsOpen && (
         <GoalsEditor
+          anchor={rowRef.current}
           category={category}
           goals={goals}
           onClose={() => setGoalsOpen(false)}
@@ -157,6 +163,7 @@ export function CategoryRow({
       )}
       {coloring && (
         <ColorPicker
+          anchor={rowRef.current}
           value={category.color}
           onClose={() => setColoring(false)}
           onPick={async (hex) => {
@@ -189,17 +196,18 @@ export function CategoryRow({
 type HabitMode = 'off' | 'daily_habit' | 'weekly_frequency';
 
 function GoalsEditor({
+  anchor,
   category,
   goals,
   onClose,
   onUpdated,
 }: {
+  anchor: HTMLElement | null;
   category: Category;
   goals: Goal[];
   onClose: () => void;
   onUpdated: () => Promise<void> | void;
 }) {
-  const rootRef = useRef<HTMLDivElement>(null);
   const weeklyGoal = goals.find((g) => g.kind === 'weekly_minutes');
   const habitGoal = goals.find(
     (g) => g.kind === 'daily_habit' || g.kind === 'weekly_frequency'
@@ -216,23 +224,6 @@ function GoalsEditor({
     habitGoal?.kind === 'weekly_frequency' ? habitGoal.target : 3
   );
   const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    function onDown(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [onClose]);
 
   async function commitHours() {
     const trimmed = hoursDraft.trim();
@@ -282,13 +273,7 @@ function GoalsEditor({
   }
 
   return (
-    // Left-anchored like ColorPicker: the editor is wider than the sidebar,
-    // so it must grow rightward over the timeline, not toward the window edge.
-    <div
-      ref={rootRef}
-      className="popover absolute left-2 top-8 z-40 p-3 w-[240px]"
-      onClick={(e) => e.stopPropagation()}
-    >
+    <AnchoredPopover anchor={anchor} onClose={onClose} width={240}>
       <div className="text-[11px] uppercase tracking-wider text-faint mb-2">
         Goals · {category.name}
       </div>
@@ -358,7 +343,7 @@ function GoalsEditor({
           Close
         </button>
       </div>
-    </div>
+    </AnchoredPopover>
   );
 }
 

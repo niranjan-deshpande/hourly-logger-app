@@ -1,41 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { isValidHex, PALETTE } from '../lib/colors';
+import { AnchoredPopover } from './AnchoredPopover';
 
 interface Props {
+  anchor: HTMLElement | null;
   value: string;
   onPick: (hex: string) => void;
   onClose: () => void;
-  anchor?: 'center' | 'left';
 }
 
-export function ColorPicker({ value, onPick, onClose, anchor = 'left' }: Props) {
+export function ColorPicker({ anchor, value, onPick, onClose }: Props) {
   const [custom, setCustom] = useState(value);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function onDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [onClose]);
-
   const valid = isValidHex(custom);
 
   return (
-    <div
-      ref={ref}
-      className={`popover absolute z-40 p-3 w-[220px] ${
-        anchor === 'center' ? 'left-1/2 -translate-x-1/2' : 'left-2'
-      } top-9`}
-    >
+    <AnchoredPopover anchor={anchor} onClose={onClose} width={220}>
       <div className="grid grid-cols-6 gap-1.5">
         {PALETTE.map((c) => (
           <button
@@ -75,6 +54,6 @@ export function ColorPicker({ value, onPick, onClose, anchor = 'left' }: Props) 
           Apply
         </button>
       </div>
-    </div>
+    </AnchoredPopover>
   );
 }
