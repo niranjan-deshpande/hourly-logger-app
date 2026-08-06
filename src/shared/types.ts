@@ -120,6 +120,15 @@ export interface AppSettings {
   phoneInboxDefaultMinutes: number;
   phoneInboxLastImportAt: string | null; // ISO, for a "Last imported" status
   phoneInboxLastError: string | null; // cleared on a clean scan
+  // Phone relay (Cloudflare Worker mailbox) — the no-Shortcuts path. The
+  // phone web app POSTs entries to a private Worker; the Mac polls them
+  // into the same import pipeline and pushes categories/phrases back up
+  // so the phone can show preset chips. See src/main/phoneRelay.ts.
+  phoneRelayEnabled: boolean;
+  phoneRelayUrl: string; // e.g. https://…workers.dev; '' = not configured
+  phoneRelayToken: string; // shared Bearer secret, matches the Worker
+  phoneRelayLastSyncAt: string | null; // ISO, for a "Last synced" status
+  phoneRelayLastError: string | null; // cleared on a clean poll
 }
 
 export interface AppPaths {

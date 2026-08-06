@@ -164,6 +164,9 @@ export interface Api {
     ensureCategory: () => Promise<number>;
     onNew: (cb: () => void) => () => void;
   };
+  phoneRelay: {
+    syncNow: () => Promise<{ ok: boolean; error?: string }>;
+  };
   reveal: (path: string) => Promise<boolean>;
   openExternal: (url: string) => Promise<boolean>;
 }

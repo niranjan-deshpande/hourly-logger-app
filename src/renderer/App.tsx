@@ -303,8 +303,13 @@ export default function App() {
     }
   }, [refreshCategories, bumpDataVersion]);
 
+  // Either transport being on turns the drain on — getPending merges the
+  // iCloud inbox and the Cloudflare relay behind the same surface.
+  const phoneCaptureOn = Boolean(
+    settings?.phoneInboxEnabled || settings?.phoneRelayEnabled
+  );
   useEffect(() => {
-    if (!settings?.phoneInboxEnabled || !categoriesReady) return;
+    if (!phoneCaptureOn || !categoriesReady) return;
     void drainPhoneInbox(); // catch up on mount / when enabled
     const unsubscribe = window.api.phoneInbox.onNew(() => void drainPhoneInbox());
     const onFocus = () => void drainPhoneInbox();
@@ -313,7 +318,7 @@ export default function App() {
       unsubscribe();
       window.removeEventListener('focus', onFocus);
     };
-  }, [settings?.phoneInboxEnabled, categoriesReady, drainPhoneInbox]);
+  }, [phoneCaptureOn, categoriesReady, drainPhoneInbox]);
 
   // Session handlers — exposed to DayToolbar (start/finish) and
   // Timeline (the ghost block + RecordingEditor) via DayView.

@@ -14,6 +14,7 @@ import { getDb } from './db';
 import { getSettings } from './settings';
 import { startCalendarSync, stopCalendarSync } from './calendarSync';
 import { startPhoneInbox, stopPhoneInbox } from './phoneInbox';
+import { startPhoneRelay, stopPhoneRelay } from './phoneRelay';
 import { setMainWindow } from './windows';
 import { markQuitting } from './coverWindows';
 import { hideOverlay, markOverlayQuitting, showOverlay } from './overlayWindow';
@@ -124,6 +125,13 @@ app.whenReady().then(() => {
     console.error('Phone inbox failed to start:', err);
   }
 
+  // Poll the Cloudflare relay for entries logged from the phone web app.
+  try {
+    startPhoneRelay();
+  } catch (err) {
+    console.error('Phone relay failed to start:', err);
+  }
+
   // Hold-to-peek overlay: pill with the live pomodoro countdown while
   // Ctrl+Option+P is held.
   registerHoldToPeek({
@@ -150,6 +158,7 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
   stopCalendarSync();
   stopPhoneInbox();
+  stopPhoneRelay();
   // Let cover/overlay windows actually close instead of hiding.
   markQuitting();
   markOverlayQuitting();

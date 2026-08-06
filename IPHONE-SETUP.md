@@ -1,103 +1,138 @@
 # Logging from your iPhone
 
 Log activities from your phone and have them appear automatically on the
-Hourly Logger timeline on your Mac. It's free, works offline, and needs no
-account or server — entries ride across on **iCloud Drive**.
+Hourly Logger timeline on your Mac. There are two transports; both are
+free and both feed the same import pipeline (entries parse through the
+quick-capture grammar and land as **Actual** blocks):
 
-## How it works
+| | **Phone relay** (recommended) | **iCloud inbox** (legacy) |
+|---|---|---|
+| Phone side | A home-screen web app you control | A hand-built iOS Shortcut |
+| Presets | Your categories + remembered phrases as tappable chips | None |
+| Voice | Keyboard dictation + in-page mic button | Siri / Dictate Text |
+| Transport | Private Cloudflare Worker (free tier) | iCloud Drive file sync |
+| Latency | Seconds (Mac polls every 30 s) | iCloud's pace (seconds–minutes) |
+| Third parties | Cloudflare (your own account) | None |
 
-1. An **Apple Shortcut** on your iPhone writes one tiny JSON file per
-   entry into `iCloud Drive / HourlyLogger / inbox/`.
-2. iCloud syncs that file to your Mac (over Wi‑Fi **or** cellular).
-3. Hourly Logger watches the folder and imports each entry as an **Actual**
-   block — parsing any times you include, and routing anything it can't
-   match to a **"Phone log"** category you can re-file later.
+Both can be on at once; they don't interfere.
 
-Entries logged while the Mac app is closed simply wait in the folder and
-import the next time you open it. Latency is iCloud's pace — usually
-seconds to about a minute.
+## Phone relay (the web-app path)
 
-> The Mac creates the `HourlyLogger/inbox/` folder automatically on first
-> launch (as long as iCloud Drive is enabled). You can also create it by
-> hand in the Files app / Finder.
+### How it works
 
-## Build the Shortcut (about 3 minutes)
+1. A tiny **Cloudflare Worker** (in `phone-relay/`, deployed to your own
+   free Cloudflare account) serves a phone-sized web page and a private
+   JSON mailbox backed by a **D1** database. Everything requires a shared
+   secret token.
+2. You open the page on your iPhone, **Add to Home Screen**, and it
+   behaves like an app: type or dictate an entry, or tap a preset chip —
+   it POSTs one `{ id, text, ts }` entry to the mailbox. Offline? Entries
+   queue on the phone and send when a connection returns.
+3. The Mac app polls the mailbox every 30 s (`src/main/phoneRelay.ts`),
+   imports entries through the normal capture parser, and deletes them
+   from the mailbox after a durable commit. It also **pushes your
+   category list and learned capture phrases up** so the phone's preset
+   chips always match the Mac.
 
-Open the **Shortcuts** app on your iPhone → **+** to create a new shortcut,
-and add these actions in order:
+### One-time setup
 
-1. **Ask for Input**
-   - Input Type: **Text**
-   - Prompt: e.g. `Log what?`
-   - (For voice instead of typing, use **Dictate Text** here.)
+Deploy the Worker (needs a free Cloudflare account + `wrangler login`):
 
-2. **Date** → gives you the current date/time.
-
-3. **Format Date**
-   - Date: the **Date** from step 2
-   - Format: **ISO 8601** (make sure it includes the time)
-   - This becomes your `Formatted Date`.
-
-4. **Dictionary** — add two keys:
-   | Key    | Type | Value |
-   |--------|------|-------|
-   | `text` | Text | the **Provided Input** from step 1 |
-   | `ts`   | Text | the **Formatted Date** from step 3 |
-
-5. **Number** → **Random Number** (e.g. min `100000`, max `999999`) — just
-   to keep filenames unique. Call it `Random`.
-
-6. **Save File**
-   - File: the **Dictionary** from step 4
-   - Service / Destination: **iCloud Drive**
-   - **Ask Where to Save: OFF**
-   - **Overwrite If File Exists: OFF**
-   - Destination path / name:
-     `HourlyLogger/inbox/[Formatted Date]-[Random].json`
-     (insert the `Formatted Date` and `Random` variables; the `.json`
-     extension matters)
-
-Name the shortcut something short like **Log** and save.
-
-### Make it frictionless
-
-- **Add to Home Screen** — Shortcut details → *Add to Home Screen*. One tap → type/speak → done.
-- **Siri** — just say "Hey Siri, **Log**". Siri will ask "Log what?" and you dictate.
-- **Action Button / Back Tap / Lock Screen widget** can all trigger it too.
-
-## The file format
-
-Each file is a single JSON object. `text` is required; `ts` is optional
-(if you omit it, the file's modification time is used):
-
-```json
-{ "text": "deep work on pricing", "ts": "2026-06-22T15:30:00-07:00" }
+```sh
+cd phone-relay
+npx wrangler d1 create hourly-logger-relay   # copy database_id into wrangler.toml
+npx wrangler d1 execute hourly-logger-relay --remote --file=schema.sql -y
+npx wrangler deploy
+openssl rand -hex 20                          # this is your relay token
+npx wrangler secret put RELAY_TOKEN           # paste the token
 ```
 
-### What you can write in `text`
+Then, on the Mac: **Settings → Phone logging** — paste the Worker URL
+(`https://hourly-logger-relay.<your-subdomain>.workers.dev`) and the
+token, enable, and hit **Test connection** (this also pushes your
+categories to the phone).
 
-It runs through the same natural-language parser as the in-app quick
-capture, with "now" set to when you logged it:
+(Or, with the app quit: `./configure-mac.sh <url> <token>` writes the
+settings directly.)
 
-- `lunch` → a 30‑minute block starting now (the default duration — change
-  it in the app's settings via `phoneInboxDefaultMinutes`).
-- `deep work 2-3pm`, `standup at 10 for 30m`, `emails till noon` → the
-  times you give are honored.
-- `gym then errands` → multiple blocks, chained like in quick capture.
+Then, on the iPhone: click **Copy phone link** in Settings (it's the
+Worker URL with `#t=<token>` appended), get it to your phone (AirDrop /
+Notes / iMessage-to-yourself), open it in Safari, then
+Share → **Add to Home Screen**. Done — the token is remembered on the
+phone; the link never needs opening again.
 
-Anything the parser can't match to one of your categories goes into the
-auto‑created **"Phone log"** category so nothing is lost — recategorize it
-on the Mac whenever.
+> The link contains your secret token. Don't share it. If it ever leaks,
+> rotate: `npx wrangler secret put RELAY_TOKEN` with a new value, update
+> the Mac setting, and re-open the new link on the phone.
 
-## Notes & limits
+### Using it
 
-- **Same device, no Mac required to be on Wi‑Fi specifically** — iCloud
-  moves files over any connection. The Mac just needs to be running (and
-  the app opened at some point) to import them.
-- **Duplicates:** each entry is its own uniquely-named file, so it imports
-  exactly once. Imported files are moved to `HourlyLogger/processed/`;
-  unreadable ones go to `HourlyLogger/failed/`.
-- **Privacy:** everything stays in your own iCloud and your local
-  database. No third‑party services.
-- Turn the whole thing off (or point it at a different folder) via the
-  `phoneInboxEnabled` / `phoneInboxFolderPath` settings.
+- **Type** in the box and hit **Log** — the text runs through the same
+  parser as quick capture (`deep work 2-3pm`, `lunch`, `gym then
+  errands` all work; a timeless entry becomes a
+  `phoneInboxDefaultMinutes`-length block starting now).
+- **Tap a chip** (a category, or a phrase the Mac has learned) to fill
+  the box — tweak times if you like, then Log.
+- **Voice**: the in-page mic button records audio and transcribes it with
+  **Whisper (large-v3-turbo)** on Workers AI — noticeably better than
+  Apple's keyboard dictation, especially with names and run-on phrases.
+  Tap to start (pulsing red), tap again to stop; the transcript appends
+  to whatever's already in the box. Recordings cap at 2 minutes; the
+  keyboard's own mic key still works as a fallback (and is the offline
+  option, since Whisper needs a connection).
+- **"Start from my last entry (ends now)"** prefixes
+  `from last event till now …`, so the block spans from the end of your
+  last logged block to the moment you hit Log — perfect for "that walk I
+  just finished".
+- Anything the parser can't match to a category is filed under **"Phone
+  log"** for re-filing later — nothing is ever dropped.
+- **Last 2 hours** — a mini view of your recent timeline (colored bar +
+  the latest entries with times), so you can see where your last block
+  ended before logging the next one. The Mac pushes it alongside the
+  preset catalog whenever your blocks change (≤30 s behind), and a small
+  "from Mac Nm ago" stamp shows how fresh the snapshot is.
+
+### Cost & limits
+
+Free-tier arithmetic: polling every 30 s ≈ 2,880 Worker requests/day
+(limit: 100,000/day) and the same order of D1 reads (limit: 5M/day).
+Catalog pushes only happen when something changed. Voice transcription
+uses the Workers AI free allocation (10,000 neurons/day ≈ several hours
+of Whisper audio). You will not hit the limits.
+
+## iCloud inbox (the legacy Shortcut path)
+
+Still fully supported — an iOS Shortcut writes one JSON file per entry
+(`{ "text": "...", "ts": "..." }`) into `iCloud Drive/HourlyLogger/inbox/`;
+the Mac watches the folder, imports, and files entries into `processed/`
+(malformed ones into `failed/`). Toggle via `phoneInboxEnabled`; point at
+a custom folder via `phoneInboxFolderPath`.
+
+<details>
+<summary>Building the Shortcut</summary>
+
+Open **Shortcuts** on the iPhone → **+**, add:
+
+1. **Ask for Input** (Text) — prompt: `Log what?` (use **Dictate Text**
+   for voice).
+2. **Date** → current date/time.
+3. **Format Date** → ISO 8601 with time (call it `Formatted Date`).
+4. **Dictionary** — `text`: Provided Input, `ts`: Formatted Date.
+5. **Number** → Random Number 100000–999999 (call it `Random`).
+6. **Save File** → iCloud Drive, Ask Where to Save OFF, path
+   `HourlyLogger/inbox/[Formatted Date]-[Random].json`.
+
+Trigger it from the Home Screen, Siri, the Action Button, or Back Tap.
+
+</details>
+
+## Shared behavior & privacy
+
+- Entries logged while the Mac app is closed simply wait (in the Worker
+  mailbox or the iCloud folder) and import on next launch.
+- Each entry has a unique id and the Mac keeps a processed-ids ledger per
+  transport, so nothing can import twice — even if an ack or an iCloud
+  delete goes missing.
+- Relay entries transit your own Cloudflare account and are deleted from
+  it after import; iCloud entries never leave Apple + your machines. The
+  timeline database itself stays local either way.

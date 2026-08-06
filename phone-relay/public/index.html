@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>Hourly Logger</title>
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="apple-touch-icon" href="/icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Logger" />
+<style>
+  :root {
+    --bg: #F6F4EF;
+    --card: #FFFFFF;
+    --ink: #2B2723;
+    --muted: #7A7268;
+    --faint: #A79E92;
+    --line: #E4DFD6;
+    --accent: #7F6A54;
+    --accent-ink: #FFFFFF;
+    --ok: #6B7F54;
+    --warn: #A66E5C;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1E1B18;
+      --card: #282420;
+      --ink: #E9E4DC;
+      --muted: #A79E92;
+      --faint: #6E675E;
+      --line: #3A342E;
+      --accent: #A08A6F;
+      --accent-ink: #1E1B18;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: calc(env(safe-area-inset-top) + 18px) 16px calc(env(safe-area-inset-bottom) + 24px);
+    max-width: 560px;
+    margin: 0 auto;
+  }
+  header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+  h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  #status { font-size: 12px; color: var(--faint); }
+  #status.queued { color: var(--warn); }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+
+  form#composer { display: flex; gap: 8px; align-items: stretch; }
+  #text {
+    flex: 1; min-width: 0;
+    font: inherit; color: var(--ink);
+    background: transparent; border: none; outline: none;
+    padding: 8px 4px;
+  }
+  #text::placeholder { color: var(--faint); }
+  button { font: inherit; border: none; background: none; color: inherit; cursor: pointer; }
+  .iconbtn {
+    width: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); flex: none;
+  }
+  .iconbtn.active { color: var(--warn); animation: rec-pulse 1.1s ease-in-out infinite; }
+  .iconbtn.busy { color: var(--accent); animation: rec-pulse 0.7s ease-in-out infinite; }
+  @keyframes rec-pulse { 50% { opacity: 0.35; } }
+  #send {
+    background: var(--accent); color: var(--accent-ink);
+    border-radius: 10px; padding: 0 18px; font-weight: 600; flex: none;
+  }
+  #send:disabled { opacity: 0.45; }
+
+  .anchor-row { display: flex; align-items: center; gap: 8px; margin: 12px 2px 0; }
+  .anchor-row label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 7px; }
+  .anchor-row input { width: 16px; height: 16px; accent-color: var(--accent); }
+
+  .section { margin-top: 22px; }
+  .section .title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--faint); margin-bottom: 9px;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+    padding: 8px 14px; font-size: 14.5px; color: var(--ink);
+  }
+  .chip .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .chip:active { transform: scale(0.97); }
+  .empty { font-size: 13px; color: var(--faint); font-style: italic; }
+
+  /* mini view of recent activity (pushed by the Mac with the catalog) */
+  #miniBar {
+    position: relative; height: 12px; border-radius: 6px;
+    background: var(--line); overflow: hidden;
+  }
+  #miniBar span {
+    position: absolute; top: 0; bottom: 0; border-radius: 3px;
+    min-width: 2px;
+  }
+  .bar-labels {
+    display: flex; justify-content: space-between;
+    font-size: 10.5px; color: var(--faint); margin: 4px 2px 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .recent-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13.5px; padding: 3.5px 2px; min-width: 0;
+  }
+  .recent-row .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .recent-row .name { flex: none; }
+  .recent-row .note {
+    color: var(--faint); overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; min-width: 0; font-size: 12.5px;
+  }
+  .recent-row .time {
+    margin-left: auto; color: var(--faint); flex: none;
+    font-size: 12px; font-variant-numeric: tabular-nums;
+  }
+  #freshness { text-transform: none; letter-spacing: 0; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 28px);
+    transform: translateX(-50%) translateY(20px);
+    background: var(--ink); color: var(--bg);
+    padding: 9px 18px; border-radius: 999px; font-size: 14px;
+    opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s;
+    white-space: nowrap; z-index: 10;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  #setup { margin-top: 10vh; }
+  #setup h2 { font-size: 16px; margin-bottom: 8px; }
+  #setup p { font-size: 13.5px; color: var(--muted); margin-bottom: 14px; }
+  #setup input {
+    width: 100%; font: 14px ui-monospace, monospace; color: var(--ink);
+    background: transparent; border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; outline: none;
+  }
+  #setup button { margin-top: 12px; background: var(--accent); color: var(--accent-ink);
+    border-radius: 10px; padding: 10px 18px; font-weight: 600; width: 100%; }
+
+  footer { margin-top: 30px; text-align: center; }
+  footer button { font-size: 11.5px; color: var(--faint); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <div id="setup" class="hidden">
+    <h2>Connect to your Mac</h2>
+    <p>Paste the relay token from Hourly Logger on your Mac
+       (Settings → Phone logging). You only do this once.</p>
+    <input id="tokenInput" placeholder="relay token" autocomplete="off"
+           autocapitalize="off" autocorrect="off" spellcheck="false" />
+    <button id="tokenSave">Connect</button>
+  </div>
+
+  <div id="app" class="hidden">
+    <header>
+      <h1>Hourly Logger</h1>
+      <span id="status"></span>
+    </header>
+
+    <div class="card">
+      <form id="composer">
+        <input id="text" placeholder="What did you do?" autocomplete="off"
+               autocapitalize="none" enterkeyhint="send" />
+        <button type="button" id="mic" class="iconbtn hidden" aria-label="Dictate">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="2" width="6" height="12" rx="3"/>
+            <path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/>
+          </svg>
+        </button>
+        <button type="submit" id="send">Log</button>
+      </form>
+    </div>
+
+    <div class="anchor-row">
+      <label><input type="checkbox" id="anchor" />
+        Start from my last entry (ends now)</label>
+    </div>
+
+    <div class="section hidden" id="recentSection">
+      <div class="title">Last 2 hours <span id="freshness"></span></div>
+      <div id="miniBar"></div>
+      <div class="bar-labels"><span id="barFrom"></span><span>now</span></div>
+      <div id="recentRows"></div>
+    </div>
+
+    <div class="section">
+      <div class="title">Categories</div>
+      <div class="chips" id="catChips"><span class="empty">Waiting for the Mac to sync…</span></div>
+    </div>
+
+    <div class="section">
+      <div class="title">Remembered phrases</div>
+      <div class="chips" id="phraseChips"><span class="empty">Phrases you teach the Mac app appear here.</span></div>
+    </div>
+
+    <footer><button id="reset">Change token</button></footer>
+  </div>
+
+  <div id="toast"></div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const LS = { token: 'hl_token', queue: 'hl_queue', catalog: 'hl_catalog' };
+
+  // --- storage helpers ---
+  const readJson = (k, fallback) => {
+    try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fallback; }
+    catch { return fallback; }
+  };
+  const writeJson = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+
+  // --- token bootstrap: #t=… in the URL wins, else localStorage, else setup ---
+  function adoptHashToken() {
+    const t = new URLSearchParams(location.hash.slice(1)).get('t');
+    if (!t) return false;
+    localStorage.setItem(LS.token, t);
+    history.replaceState(null, '', location.pathname); // don't keep it on screen
+    return true;
+  }
+  adoptHashToken();
+  let token = localStorage.getItem(LS.token) || '';
+  // Also adopt a token arriving via hash-only navigation (no page reload).
+  window.addEventListener('hashchange', () => {
+    if (adoptHashToken()) {
+      token = localStorage.getItem(LS.token) || '';
+      showApp();
+      loadCatalog();
+      flushQueue();
+    }
+  });
+
+  function showSetup() {
+    $('setup').classList.remove('hidden');
+    $('app').classList.add('hidden');
+  }
+  function showApp() {
+    $('setup').classList.add('hidden');
+    $('app').classList.remove('hidden');
+  }
+  $('tokenSave').addEventListener('click', () => {
+    const t = $('tokenInput').value.trim();
+    if (!t) return;
+    localStorage.setItem(LS.token, t);
+    token = t;
+    showApp();
+    loadCatalog();
+    flushQueue();
+  });
+  $('reset').addEventListener('click', () => {
+    localStorage.removeItem(LS.token);
+    token = '';
+    showSetup();
+  });
+
+  // --- api ---
+  const api = (path, init = {}) =>
+    fetch('/api/' + path, {
+      ...init,
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'Bearer ' + token,
+        ...(init.headers || {}),
+      },
+    });
+
+  // --- local ISO timestamp with the phone's UTC offset ---
+  function localIso(d = new Date()) {
+    const p = (n) => String(n).padStart(2, '0');
+    const off = -d.getTimezoneOffset();
+    const sign = off >= 0 ? '+' : '-';
+    const a = Math.abs(off);
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+      'T' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()) +
+      sign + p(Math.floor(a / 60)) + ':' + p(a % 60);
+  }
+
+  // --- offline queue ---
+  let flushing = false;
+  const queue = () => readJson(LS.queue, []);
+
+  function updateStatus() {
+    const n = queue().length;
+    const el = $('status');
+    if (n > 0) { el.textContent = n + ' queued'; el.className = 'queued'; }
+    else { el.textContent = ''; el.className = ''; }
+  }
+
+  async function flushQueue() {
+    if (flushing || !token) return;
+    flushing = true;
+    try {
+      let q = queue();
+      while (q.length > 0) {
+        const e = q[0];
+        const res = await api('entries', { method: 'POST', body: JSON.stringify(e) });
+        if (!res.ok) break; // auth/server problem — keep queued
+        q = q.slice(1);
+        writeJson(LS.queue, q);
+      }
+    } catch { /* offline — try again later */ }
+    finally { flushing = false; updateStatus(); }
+  }
+
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toast._h);
+    toast._h = setTimeout(() => t.classList.remove('show'), 1800);
+  }
+
+  async function log(text) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    if ($('anchor').checked) {
+      // The Mac's parser anchors this to the end of the last logged block.
+      text = 'from last event till now ' + trimmed;
+      $('anchor').checked = false;
+    } else {
+      text = trimmed;
+    }
+    const entry = {
+      id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+      text,
+      ts: localIso(),
+    };
+    writeJson(LS.queue, [...queue(), entry]);
+    updateStatus();
+    $('text').value = '';
+    await flushQueue();
+    toast(queue().length === 0 ? 'Logged ✓' : 'Saved — sends when online');
+  }
+
+  $('composer').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    log($('text').value);
+  });
+
+  // Append rather than replace, so "from 7:30am to 8am" + a tapped chip
+  // (or a dictated phrase) composes into one entry.
+  function appendToInput(text) {
+    const el = $('text');
+    const cur = el.value.trim();
+    el.value = cur ? cur + ' ' + text : text;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }
+
+  // --- preset chips (catalog pushed by the Mac) ---
+  function chip(label, color, onTap) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip';
+    if (color) {
+      const d = document.createElement('span');
+      d.className = 'dot';
+      d.style.background = color;
+      b.appendChild(d);
+    }
+    b.appendChild(document.createTextNode(label));
+    b.addEventListener('click', onTap);
+    return b;
+  }
+
+  // --- mini view: the last ~2 hours of the Mac's timeline ---
+  const fmtTime = (ms) =>
+    new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+  function renderRecent(recent, updatedAt) {
+    const WINDOW = 2 * 3_600_000;
+    const now = Date.now();
+    const from = now - WINDOW;
+    const all = (Array.isArray(recent) ? recent : [])
+      .map((r) => ({ ...r, s: Date.parse(r.start), e: Date.parse(r.end) }))
+      .filter((r) => Number.isFinite(r.s) && Number.isFinite(r.e) && r.e > r.s);
+    $('recentSection').classList.toggle('hidden', all.length === 0);
+    if (all.length === 0) return;
+
+    // Freshness — when the Mac last pushed this snapshot.
+    const age = updatedAt ? now - Date.parse(updatedAt) : NaN;
+    $('freshness').textContent = Number.isFinite(age)
+      ? '· from Mac ' + (age < 90_000 ? 'just now' : Math.round(age / 60_000) + 'm ago')
+      : '';
+
+    // Bar: blocks clipped to the window, drawn proportionally.
+    const inWindow = all.filter((r) => r.e > from && r.s < now);
+    const bar = $('miniBar');
+    bar.replaceChildren();
+    for (const r of inWindow) {
+      const seg = document.createElement('span');
+      seg.style.left = (Math.max(0, (r.s - from) / WINDOW) * 100) + '%';
+      seg.style.width =
+        (((Math.min(r.e, now) - Math.max(r.s, from)) / WINDOW) * 100) + '%';
+      seg.style.background = r.color || 'var(--accent)';
+      bar.appendChild(seg);
+    }
+    $('barFrom').textContent = fmtTime(from);
+
+    // Rows — newest first. If the window is empty, show the latest block
+    // so "when did I last log?" is still answerable at a glance.
+    const rows = $('recentRows');
+    rows.replaceChildren();
+    const shown = inWindow.length > 0
+      ? [...inWindow].sort((a, b) => b.s - a.s).slice(0, 6)
+      : [...all].sort((a, b) => b.e - a.e).slice(0, 1);
+    if (inWindow.length === 0) {
+      const d = document.createElement('div');
+      d.className = 'empty';
+      d.textContent = 'Nothing in the last 2 hours — latest:';
+      rows.appendChild(d);
+    }
+    for (const r of shown) {
+      const row = document.createElement('div');
+      row.className = 'recent-row';
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      dot.style.background = r.color || 'var(--accent)';
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = r.name;
+      const time = document.createElement('span');
+      time.className = 'time';
+      time.textContent = fmtTime(r.s) + '–' + fmtTime(r.e);
+      row.append(dot, name);
+      if (r.note && r.note !== r.name) {
+        const note = document.createElement('span');
+        note.className = 'note';
+        note.textContent = r.note;
+        row.append(note);
+      }
+      row.append(time);
+      rows.appendChild(row);
+    }
+  }
+
+  function renderCatalog(cat) {
+    const cats = Array.isArray(cat?.categories) ? cat.categories : [];
+    const phrases = Array.isArray(cat?.phrases) ? cat.phrases : [];
+    renderRecent(cat?.recent, cat?.updatedAt);
+    const fill = (text) => () => appendToInput(text);
+
+    const cc = $('catChips');
+    cc.replaceChildren();
+    if (cats.length === 0) {
+      cc.innerHTML = '<span class="empty">Waiting for the Mac to sync…</span>';
+    } else {
+      for (const c of cats) cc.appendChild(chip(c.name, c.color, fill(c.name)));
+    }
+
+    const pc = $('phraseChips');
+    pc.replaceChildren();
+    if (phrases.length === 0) {
+      pc.innerHTML = '<span class="empty">Phrases you teach the Mac app appear here.</span>';
+    } else {
+      for (const p of phrases) pc.appendChild(chip(p.text, p.color, fill(p.text)));
+    }
+  }
+
+  async function loadCatalog() {
+    renderCatalog(readJson(LS.catalog, null)); // cached copy first (offline)
+    if (!token) return;
+    try {
+      const res = await api('catalog');
+      if (!res.ok) return;
+      const cat = await res.json();
+      writeJson(LS.catalog, cat);
+      renderCatalog(cat);
+    } catch { /* offline — the cached chips stand */ }
+  }
+
+  // --- voice ---
+  // Preferred path: record with MediaRecorder, transcribe with Whisper on
+  // the Worker (Workers AI) — noticeably better than Apple's dictation,
+  // still free. Tap to start, tap again to stop; the transcript appends
+  // to the input like a chip. Fallback: on-device SpeechRecognition.
+  // (The keyboard's own mic key works regardless.)
+  const mic = $('mic');
+  const canRecord = Boolean(
+    navigator.mediaDevices?.getUserMedia && window.MediaRecorder
+  );
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (canRecord) {
+    mic.classList.remove('hidden');
+    const MAX_RECORD_MS = 120_000;
+    let recorder = null;
+    let chunks = [];
+    let stopTimer = null;
+
+    mic.addEventListener('click', async () => {
+      if (mic.classList.contains('busy')) return; // transcription in flight
+      if (recorder) { recorder.stop(); return; } // second tap = stop
+      if (!token) { toast('Connect first'); return; }
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        toast('Microphone unavailable');
+        return;
+      }
+      chunks = [];
+      // iOS Safari records audio/mp4 (AAC); Chrome/Android audio/webm.
+      // Whisper accepts both, so just take whatever's supported.
+      const mime = MediaRecorder.isTypeSupported('audio/mp4')
+        ? 'audio/mp4'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : '';
+      recorder = mime
+        ? new MediaRecorder(stream, { mimeType: mime })
+        : new MediaRecorder(stream);
+      recorder.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) chunks.push(ev.data);
+      };
+      recorder.onstop = async () => {
+        clearTimeout(stopTimer);
+        stream.getTracks().forEach((t) => t.stop());
+        const type = recorder.mimeType || 'application/octet-stream';
+        recorder = null;
+        mic.classList.remove('active');
+        const blob = new Blob(chunks, { type });
+        chunks = [];
+        if (blob.size < 1500) return; // accidental double-tap, no speech
+        mic.classList.add('busy');
+        try {
+          const res = await fetch('/api/transcribe', {
+            method: 'POST',
+            headers: {
+              authorization: 'Bearer ' + token,
+              'content-type': type,
+            },
+            body: blob,
+          });
+          const data = res.ok ? await res.json() : null;
+          const text = (data?.text ?? '').trim();
+          if (text) appendToInput(text);
+          else toast(res && res.ok ? "Didn't catch that" : 'Transcription failed');
+        } catch {
+          toast('Transcription failed — offline?');
+        } finally {
+          mic.classList.remove('busy');
+        }
+      };
+      recorder.start();
+      mic.classList.add('active');
+      stopTimer = setTimeout(() => {
+        if (recorder) recorder.stop();
+      }, MAX_RECORD_MS);
+    });
+  } else if (SR) {
+    mic.classList.remove('hidden');
+    let rec = null;
+    mic.addEventListener('click', () => {
+      if (rec) { rec.stop(); return; }
+      rec = new SR();
+      rec.lang = navigator.language || 'en-US';
+      rec.interimResults = true;
+      let finalText = $('text').value ? $('text').value + ' ' : '';
+      rec.onresult = (ev) => {
+        let interim = '';
+        for (const r of ev.results) {
+          if (r.isFinal) finalText += r[0].transcript;
+          else interim += r[0].transcript;
+        }
+        $('text').value = (finalText + interim).trimStart();
+      };
+      rec.onend = () => { rec = null; mic.classList.remove('active'); };
+      rec.onerror = () => { rec = null; mic.classList.remove('active'); };
+      mic.classList.add('active');
+      try { rec.start(); } catch { rec = null; mic.classList.remove('active'); }
+    });
+  }
+
+  // --- lifecycle ---
+  window.addEventListener('online', flushQueue);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { flushQueue(); loadCatalog(); }
+  });
+  setInterval(flushQueue, 20_000);
+  // Keep the mini view fresh while the page is open: re-fetch the catalog
+  // (and re-render the sliding 2h window) once a minute.
+  setInterval(() => {
+    if (!document.hidden) loadCatalog();
+  }, 60_000);
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+
+  if (token) { showApp(); loadCatalog(); flushQueue(); }
+  else showSetup();
+  updateStatus();
+})();
+</script>
+</body>
+</html>

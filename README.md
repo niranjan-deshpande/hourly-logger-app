@@ -41,6 +41,11 @@ Built with Electron + React + TypeScript + Tailwind. SQLite via
   in as Plan blocks under a "From calendar" category.
 - **Export / import / backup.** Stable JSON (and CSV-zip) export, replace-all
   JSON import, and silent daily JSON backups (last 30 kept).
+- **iPhone logging.** A home-screen web app (self-hosted on a free
+  Cloudflare Worker in `phone-relay/`) with your categories and learned
+  phrases as tappable presets, dictation support, and an offline queue —
+  entries import automatically through the quick-capture parser. An
+  iCloud-file-drop Shortcut path also still works. See `IPHONE-SETUP.md`.
 
 ## Running in development
 
@@ -242,6 +247,11 @@ hourly-logger/
   scripts/
     build-icon.mjs                     # SVG → icns + PNG
     smoke-db.mjs
+  phone-relay/                         # Cloudflare Worker: phone web app + mailbox API
+    wrangler.toml / schema.sql
+    src/worker.js                      # auth'd JSON API over D1
+    public/                            # the phone page (PWA), served by the Worker
+    configure-mac.sh                   # one-shot: write relay settings into the Mac app
   src/
     main/                     # Electron main process
       index.ts                # window, lifecycle, IPC registration, backups, sleep-pause
@@ -252,6 +262,8 @@ hourly-logger/
       backup.ts               # daily JSON snapshot + rotation
       capture.ts              # transactional commit of quick-capture drafts
       aliases.ts              # learned phrase→category aliases (aliases.json)
+      phoneInbox.ts           # iCloud file-drop phone inbox (legacy Shortcut path)
+      phoneRelay.ts           # Cloudflare Worker phone relay (poll entries, push catalog)
       activeSession.ts        # live-recording JSON file (crash recovery)
       calendarSync.ts         # ICS polling + reconcile into Plan blocks
       notifications.ts        # silent pomodoro notifications

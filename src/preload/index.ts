@@ -186,6 +186,10 @@ const api = {
       };
     },
   },
+  phoneRelay: {
+    // Connectivity test + immediate catalog push (Settings panel).
+    syncNow: () => call<{ ok: boolean; error?: string }>('phoneRelay.syncNow'),
+  },
   reveal: (path: string) => call<boolean>('reveal', { path }),
   openExternal: (url: string) => call<boolean>('openExternal', { url }),
 };

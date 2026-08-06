@@ -27,6 +27,12 @@ const DEFAULTS: AppSettings = {
   phoneInboxDefaultMinutes: 30,
   phoneInboxLastImportAt: null,
   phoneInboxLastError: null,
+  // Phone relay — off until the user pastes their Worker URL + token.
+  phoneRelayEnabled: false,
+  phoneRelayUrl: '',
+  phoneRelayToken: '',
+  phoneRelayLastSyncAt: null,
+  phoneRelayLastError: null,
 };
 
 let cache: AppSettings | null = null;

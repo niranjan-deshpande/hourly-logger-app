@@ -1,0 +1,23 @@
+name = "hourly-logger-relay"
+main = "src/worker.js"
+compatibility_date = "2026-07-01"
+
+# The phone web app — static files served straight from the Worker's edge
+# cache. Requests that match a file here never reach the Worker script;
+# everything else (the /api/* routes) does.
+[assets]
+directory = "./public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hourly-logger-relay"
+# NOTE: this id belongs to the original author's Cloudflare account. If you
+# are deploying your own copy, run `npx wrangler d1 create hourly-logger-relay`
+# and replace the id below with the one it prints.
+database_id = "594f28b0-33d1-4047-84d3-26ca0702b413"
+
+# Workers AI — used only for /api/transcribe (Whisper). The free daily
+# allocation covers hours of audio; recordings are capped client- and
+# server-side anyway.
+[ai]
+binding = "AI"

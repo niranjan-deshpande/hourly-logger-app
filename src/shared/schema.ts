@@ -255,6 +255,29 @@ export const appSettingsSchema = z.object({
   phoneInboxDefaultMinutes: z.number().int().min(1).max(1440).default(30),
   phoneInboxLastImportAt: z.string().nullable().default(null),
   phoneInboxLastError: z.string().nullable().default(null),
+  // Phone relay (Cloudflare Worker mailbox). Complements/replaces the
+  // iCloud inbox: the phone web app POSTs entries to a private Worker and
+  // the Mac polls them down through the same import pipeline. Empty
+  // URL/token means "not configured". All defaulted for old settings.json.
+  phoneRelayEnabled: z.boolean().default(false),
+  phoneRelayUrl: z
+    .string()
+    .refine(
+      (u) => {
+        if (u === '') return true;
+        try {
+          const proto = new URL(u).protocol;
+          return proto === 'http:' || proto === 'https:';
+        } catch {
+          return false;
+        }
+      },
+      { message: 'Relay URL must start with http:// or https://' }
+    )
+    .default(''),
+  phoneRelayToken: z.string().default(''),
+  phoneRelayLastSyncAt: z.string().nullable().default(null),
+  phoneRelayLastError: z.string().nullable().default(null),
 });
 
 // A file dropped by the iOS Shortcut into the inbox folder. Lenient on

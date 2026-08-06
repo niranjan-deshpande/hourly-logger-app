@@ -266,6 +266,8 @@ export function SettingsPanel({
           onMessage={setOpMessage}
         />
 
+        <PhoneLoggingSection settings={settings} onUpdate={onUpdate} />
+
         <Section title="Help">
           <button
             className="btn flex items-center gap-2 text-sm"
@@ -596,6 +598,145 @@ function CalendarSyncSection({
             </div>
           </div>
         )}
+      </div>
+    </Section>
+  );
+}
+
+// "Phone logging" section — the Cloudflare relay. The Worker URL + token
+// pair connects three parties: the phone web app POSTs entries, this app
+// polls them down and pushes categories/phrases up for the preset chips.
+function PhoneLoggingSection({
+  settings,
+  onUpdate,
+}: {
+  settings: AppSettings;
+  onUpdate: (partial: Partial<AppSettings>) => Promise<void> | void;
+}) {
+  const [urlDraft, setUrlDraft] = useState(settings.phoneRelayUrl);
+  const [tokenDraft, setTokenDraft] = useState(settings.phoneRelayToken);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  useEffect(() => setUrlDraft(settings.phoneRelayUrl), [settings.phoneRelayUrl]);
+  useEffect(
+    () => setTokenDraft(settings.phoneRelayToken),
+    [settings.phoneRelayToken]
+  );
+
+  async function commitUrl() {
+    const trimmed = urlDraft.trim();
+    if (trimmed === settings.phoneRelayUrl) return;
+    if (trimmed && !isValidUrl(trimmed)) {
+      setTestResult("That URL didn't look valid — must start with https://");
+      return;
+    }
+    await onUpdate({ phoneRelayUrl: trimmed });
+  }
+
+  async function commitToken() {
+    const trimmed = tokenDraft.trim();
+    if (trimmed !== settings.phoneRelayToken) {
+      await onUpdate({ phoneRelayToken: trimmed });
+    }
+  }
+
+  async function testConnection() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await window.api.phoneRelay.syncNow();
+      setTestResult(
+        res.ok ? 'Connected — presets pushed to the phone.' : res.error ?? 'Failed'
+      );
+    } catch (e: any) {
+      setTestResult(e?.message ?? 'Test failed');
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  const configured =
+    settings.phoneRelayUrl.trim() !== '' && settings.phoneRelayToken.trim() !== '';
+  const phoneLink = configured
+    ? `${settings.phoneRelayUrl.trim().replace(/\/+$/, '')}/#t=${settings.phoneRelayToken.trim()}`
+    : null;
+  const statusLabel = settings.phoneRelayLastError
+    ? settings.phoneRelayLastError
+    : settings.phoneRelayLastSyncAt
+    ? `Last synced ${relativeTime(settings.phoneRelayLastSyncAt)}`
+    : 'Never synced';
+
+  return (
+    <Section title="Phone logging">
+      <div className="space-y-2">
+        <Row label="Enabled">
+          <input
+            type="checkbox"
+            checked={settings.phoneRelayEnabled}
+            onChange={(e) => onUpdate({ phoneRelayEnabled: e.target.checked })}
+          />
+        </Row>
+        <div>
+          <div className="text-sm mb-1">Relay URL</div>
+          <input
+            className="input-bare w-full font-mono text-[11.5px]"
+            value={urlDraft}
+            onChange={(e) => setUrlDraft(e.target.value)}
+            onBlur={commitUrl}
+            placeholder="https://hourly-logger-relay.<you>.workers.dev"
+            spellCheck={false}
+          />
+        </div>
+        <div>
+          <div className="text-sm mb-1">Relay token</div>
+          <input
+            className="input-bare w-full font-mono text-[11.5px]"
+            value={tokenDraft}
+            onChange={(e) => setTokenDraft(e.target.value)}
+            onBlur={commitToken}
+            placeholder="shared secret (matches the Worker's RELAY_TOKEN)"
+            spellCheck={false}
+          />
+        </div>
+        <Row label="Status">
+          <span
+            className="text-xs tabular-nums"
+            style={{
+              color: settings.phoneRelayLastError ? '#A66E5C' : 'var(--muted)',
+            }}
+          >
+            {statusLabel}
+          </span>
+        </Row>
+        <div className="flex items-center gap-2 pt-1">
+          <button
+            className="btn text-sm"
+            onClick={testConnection}
+            disabled={testing || !configured}
+          >
+            {testing ? 'Testing…' : 'Test connection'}
+          </button>
+          {phoneLink && (
+            <button
+              className="btn btn-ghost text-sm"
+              onClick={() => navigator.clipboard.writeText(phoneLink)}
+              title="Copy the phone setup link (includes the token)"
+            >
+              Copy phone link
+            </button>
+          )}
+        </div>
+        {testResult && (
+          <div className="text-xs text-muted break-all">{testResult}</div>
+        )}
+        <div className="text-[11px] text-faint mt-2 leading-snug">
+          Open the copied link on your iPhone (send it via AirDrop or
+          Notes), then Share → <span className="italic">Add to Home
+          Screen</span> for a one-tap logging app with your categories as
+          presets. The link contains your secret token — share it with no
+          one. See IPHONE-SETUP.md for the one-time Cloudflare setup.
+        </div>
       </div>
     </Section>
   );

@@ -46,6 +46,13 @@ import {
   markProcessed as markPhoneProcessed,
   restartPhoneInbox,
 } from './phoneInbox';
+import {
+  getPending as getRelayPending,
+  isRelayEntryId,
+  markProcessed as markRelayProcessed,
+  restartPhoneRelay,
+  syncNow as syncRelayNow,
+} from './phoneRelay';
 import * as pomodoro from './pomodoro/engine';
 
 function handle<T>(channel: string, fn: (arg: any) => T | Promise<T>) {
@@ -157,6 +164,17 @@ export function registerIpc() {
         before.phoneInboxFolderPath !== after.phoneInboxFolderPath)
     ) {
       restartPhoneInbox();
+    }
+    // Same for the relay — new URL/token/toggle takes effect immediately.
+    if (
+      (partial.phoneRelayEnabled != null &&
+        before.phoneRelayEnabled !== after.phoneRelayEnabled) ||
+      (partial.phoneRelayUrl != null &&
+        before.phoneRelayUrl !== after.phoneRelayUrl) ||
+      (partial.phoneRelayToken != null &&
+        before.phoneRelayToken !== after.phoneRelayToken)
+    ) {
+      restartPhoneRelay();
     }
     return after;
   });
@@ -370,16 +388,38 @@ export function registerIpc() {
   });
   handle('aliases.get', () => getAliases());
 
-  // Phone inbox: files an iOS Shortcut dropped into iCloud. The renderer
-  // pulls pending entries, parses + commits them through the normal
-  // capture path, then reports the ids back here to be filed away.
-  handle('phoneInbox.getPending', () => getPhonePending());
-  handle('phoneInbox.markProcessed', (raw) => {
+  // Phone inbox: entries logged from the iPhone, from EITHER transport —
+  // iCloud files (the iOS-Shortcut path) or the Cloudflare relay (the web
+  // app path, ids prefixed 'relay:'). The renderer pulls pending entries,
+  // parses + commits them through the normal capture path, then reports
+  // the ids back here; the prefix routes each ack to its source.
+  handle('phoneInbox.getPending', async () => {
+    const [local, relay] = await Promise.all([
+      Promise.resolve(getPhonePending()),
+      getRelayPending(),
+    ]);
+    // Re-sort the merged list by capture time so blocks land on the
+    // timeline in the order they were logged, whichever way they came.
+    return [...local, ...relay].sort((a, b) => {
+      const ta = a.ts ? Date.parse(a.ts) : 0;
+      const tb = b.ts ? Date.parse(b.ts) : 0;
+      if (!Number.isNaN(ta) && !Number.isNaN(tb) && ta !== tb) return ta - tb;
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    });
+  });
+  handle('phoneInbox.markProcessed', async (raw) => {
     const input = phoneInboxMarkProcessedSchema.parse(raw);
-    markPhoneProcessed(input.ids);
+    const relayIds = input.ids.filter(isRelayEntryId);
+    const localIds = input.ids.filter((id) => !isRelayEntryId(id));
+    if (localIds.length > 0) markPhoneProcessed(localIds);
+    if (relayIds.length > 0) await markRelayProcessed(relayIds);
     return true;
   });
   handle('phoneInbox.ensureCategory', () => ensureInboxCategory());
+
+  // Phone relay: connectivity test + immediate catalog push, for the
+  // Settings panel's "Test connection" button.
+  handle('phoneRelay.syncNow', () => syncRelayNow());
 
   handle('reveal', ({ path }: { path: string }) => {
     shell.showItemInFolder(path);
