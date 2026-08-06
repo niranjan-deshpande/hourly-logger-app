@@ -6,3 +6,6 @@ dist
 *.log
 .env*
 *.tsbuildinfo
+# Wrangler local state (contains Cloudflare account context)
+.wrangler/
+.dev.vars
